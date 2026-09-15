@@ -1,0 +1,9 @@
+# lib/*.sh are bash fragments sourced by bin/claude-workspace, not standalone
+# scripts: their variables and helpers come from the parent.
+shell=bash
+
+# Paths sourced through $CW_LIB are resolved at runtime, not statically.
+disable=SC1090,SC1091
+
+# Variables defined in common.sh and the adapters are shared on purpose.
+external-sources=false

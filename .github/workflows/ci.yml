@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck --version
+          shellcheck -x bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash
+
+  syntax:
+    name: shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n
+        run: |
+          for f in bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash; do
+            bash -n "$f"
+          done
+      - name: zsh -n
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zsh
+          zsh -n shell/hook.zsh
+
+  formula:
+    name: homebrew formula
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: brew style
+        run: brew style --formula Formula/claude-workspace.rb
