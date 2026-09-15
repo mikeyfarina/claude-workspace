@@ -14,12 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run shellcheck
+      - name: Install shellcheck
+        # Pinned, so CI and a developer's machine agree on what counts as clean.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends shellcheck
+          version=v0.11.0
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/$version/shellcheck-$version.linux.x86_64.tar.xz" \
+            | tar -xJ --strip-components=1 -C /usr/local/bin "shellcheck-$version/shellcheck"
           shellcheck --version
-          shellcheck -x bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash
+      - name: Run shellcheck
+        run: shellcheck -x bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash
 
   syntax:
     name: shell syntax
@@ -43,4 +46,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: brew style
-        run: brew style --formula Formula/claude-workspace.rb
+        # Homebrew only lints formulae that live in a tap, so put it in one.
+        run: |
+          brew tap-new local/ci --no-git
+          cp Formula/claude-workspace.rb "$(brew --repository)/Library/Taps/local/homebrew-ci/Formula/"
+          brew style local/ci
+          brew audit --strict local/ci/claude-workspace

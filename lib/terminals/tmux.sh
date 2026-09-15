@@ -149,7 +149,7 @@ cwterm_build() {
                 _tm rename-window -t "$win" "$a" 2>/dev/null || true
                 ;;
             S)
-                [ -n "$win" ] && _tm select-window -t "$win" 2>/dev/null || true
+                if [ -n "$win" ]; then _tm select-window -t "$win" 2>/dev/null || true; fi
                 ;;
         esac
     done

@@ -43,6 +43,8 @@ CW_TERMINALS="ghostty kitty wezterm iterm2 tmux"
 # cleared before the next is tried.
 _terminal_reset() { CW_NATIVE_TTY_MAP=""; }
 
+# The adapter id is optional; callers that omit it get detection.
+# shellcheck disable=SC2120
 terminal_load() {   # $1 optional adapter id
     local want=${1:-$CW_TERMINAL} id
     _terminal_reset

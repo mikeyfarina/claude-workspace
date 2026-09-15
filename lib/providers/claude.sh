@@ -15,7 +15,7 @@ provider_claude_list() {
         case $pid in ''|*[!0-9]*) continue ;; esac
         kill -0 "$pid" 2>/dev/null || continue
         tty=$(ps -o tty= -p "$pid" | tr -d ' ')
-        [ -n "$tty" ] && [ "$tty" != "??" ] || continue
+        if [ -z "$tty" ] || [ "$tty" = "??" ]; then continue; fi
         jq -r --arg tty "$tty" --arg pid "$pid" \
             'select(.kind == "interactive" and .sessionId != null)
              | [$tty, .sessionId, .cwd, (.name // ""), $pid] | @tsv' "$f" 2>/dev/null || true
