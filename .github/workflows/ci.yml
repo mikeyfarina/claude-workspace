@@ -13,7 +13,7 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install shellcheck
         # Pinned, so CI and a developer's machine agree on what counts as clean.
         run: |
@@ -28,7 +28,7 @@ jobs:
     name: shell syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: bash -n
         run: |
           for f in bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash; do
@@ -44,7 +44,7 @@ jobs:
     name: homebrew formula
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: brew style
         # Homebrew only lints formulae that live in a tap, so put it in one.
         run: |
