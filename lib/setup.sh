@@ -252,20 +252,20 @@ cmd_doctor() {
     fi
 
     printf '\nshell integration\n'
-    local sh rc
+    local sh rc loaded
     sh=$(current_shell); rc=$(rc_file_for "$sh")
-    if rc_has_block "$rc"; then
-        ok "hook installed in $(short "$rc")"
-    elif [ -n "$(grep -rl "claude-workspace/hook\.$sh" "$HOME/.zshrc" "$HOME/.bashrc" "${ZDOTDIR:-$HOME}"/.zshrc "$HOME/.config/fish/config.fish" 2>/dev/null | head -1)" ]; then
-        ok "hook sourced from your own shell config"
+    # The only answer that matters is whether a freshly started shell ends up
+    # with the hook loaded, however it got there: the rc block this tool writes,
+    # a dotfiles repo that sources it, or anything else.
+    loaded=$("$SHELL" -ic 'printf %s "${CW_HOOK_LOADED:-}"' 2>/dev/null | tr -d '[:space:]')
+    if [ -n "$loaded" ]; then
+        ok "a new $sh shell loads the hook"
+    elif rc_has_block "$rc"; then
+        warn "the hook is in $(short "$rc") but a new shell did not load it"
     else
-        bad "hook missing from $(short "$rc"): run claude-workspace install"
+        bad "a new $sh shell does not load the hook: run claude-workspace install"
     fi
-    if [ -n "${CW_HOOK_LOADED:-}" ]; then
-        ok "hook is loaded in this shell"
-    else
-        warn "hook is not loaded in this shell (open a new tab after installing)"
-    fi
+    [ -n "${CW_HOOK_LOADED:-}" ] || printf '  info  this shell predates the hook; that is normal until you open a new tab\n'
     if [ -n "${TTY:-}" ] || [ -t 0 ]; then
         local mytty
         mytty=$(ps -o tty= -p $$ | tr -d ' ')
@@ -275,6 +275,7 @@ cmd_doctor() {
             warn "this pane ($mytty) is not mapped yet; run claude-workspace map"
         fi
     fi
+    prune_tty_map
     printf '  info  %s of the open panes are mapped\n' "$(tty_map | wc -l | tr -d ' ')"
 
     printf '\nagent providers\n'
