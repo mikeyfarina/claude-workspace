@@ -38,10 +38,13 @@ and busy panes.
 ## Install
 
 ```sh
-brew install mikeyfarina/tap/claude-workspace   # or: git clone, then ./bin/claude-workspace install
+brew install --HEAD mikeyfarina/tap/claude-workspace
 claude-workspace install
 claude-workspace doctor
 ```
+
+`--HEAD` is required until the first tagged release. Or clone it and run
+`./bin/claude-workspace install` from the checkout.
 
 `install` links the command onto your `PATH`, adds one line to your shell rc,
 registers three Claude Code hooks so snapshots stay fresh on their own, learns
