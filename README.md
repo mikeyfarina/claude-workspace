@@ -90,11 +90,12 @@ happened to be the last thing in a pane is not a feature.
 
 ## What is supported
 
-**Terminals.** Ghostty 1.3+ is the reference implementation and the one this is
-tested against daily. tmux is supported natively and needs no OSC 7 probe,
-because tmux reports each pane's tty itself. Adapters for kitty, WezTerm and
-iTerm2 ship where their remote-control interfaces allow it; `claude-workspace
-terminals` shows which adapter is active and what it can do.
+**Terminals.** Ghostty 1.3 is the reference implementation and what this was
+built against; tmux 3.7 is verified too, and needs no OSC 7 probe because tmux
+reports each pane's tty itself. The kitty, WezTerm and iTerm2 adapters were
+written from each project's documentation and have not been run against the
+real thing. `claude-workspace terminals` says which is which rather than
+leaving you to find out.
 
 **Agents.** Claude Code is exact: the session id is recovered and resumed.
 Codex CLI is usually exact, by matching the pane's directory and start time
