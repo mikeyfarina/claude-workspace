@@ -1,21 +1,21 @@
 # shellcheck shell=bash
-# cwterm_* and CW_PROVIDER_IDS come from the adapter and providers loaded at
+# term_* and PANEFUL_PROVIDER_IDS come from the adapter and providers loaded at
 # run time, which shellcheck cannot see from this file.
 # shellcheck disable=SC2154,SC2016
 # install / uninstall / doctor: wiring the tool into a shell and into Claude
 # Code, and telling the user exactly which part is broken when it is.
 
-CW_MARK_BEGIN='# >>> claude-workspace >>>'
-CW_MARK_END='# <<< claude-workspace <<<'
-CW_CLAUDE_SETTINGS=${CW_CLAUDE_SETTINGS:-$HOME/.claude/settings.json}
+PANEFUL_MARK_BEGIN='# >>> paneful >>>'
+PANEFUL_MARK_END='# <<< paneful <<<'
+PANEFUL_CLAUDE_SETTINGS=${PANEFUL_CLAUDE_SETTINGS:-$HOME/.claude/settings.json}
 
 cmd_shell_init() {   # $1 shell name
     local sh=${1:-}
     [ -n "$sh" ] || sh=$(current_shell)
-    local f=$CW_SHELL_DIR/hook.$sh
+    local f=$PANEFUL_SHELL_DIR/hook.$sh
     if [ ! -f "$f" ]; then
         local have="" h
-        for h in "$CW_SHELL_DIR"/hook.*; do have+="${h##*/hook.} "; done
+        for h in "$PANEFUL_SHELL_DIR"/hook.*; do have+="${h##*/hook.} "; done
         die "no shell hook for '$sh' (have: $have)"
     fi
     printf '%s\n' "$f"
@@ -41,42 +41,42 @@ rc_file_for() {   # $1 shell
 # The rc line points at a stable per-user path rather than wherever the tool
 # happens to be installed, so the same line works on every machine and does not
 # change when you move from a clone to Homebrew.
-CW_HOOK_LINK_DIR=${CW_HOOK_LINK_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/claude-workspace}
+PANEFUL_HOOK_LINK_DIR=${PANEFUL_HOOK_LINK_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/paneful}
 
 link_hooks() {
     local f
-    mkdir -p "$CW_HOOK_LINK_DIR"
-    for f in "$CW_SHELL_DIR"/hook.*; do
+    mkdir -p "$PANEFUL_HOOK_LINK_DIR"
+    for f in "$PANEFUL_SHELL_DIR"/hook.*; do
         [ -e "$f" ] || continue
-        ln -sfn "$f" "$CW_HOOK_LINK_DIR/${f##*/}"
+        ln -sfn "$f" "$PANEFUL_HOOK_LINK_DIR/${f##*/}"
     done
 }
 
 rc_block() {   # $1 shell
-    local hook=$CW_HOOK_LINK_DIR/hook.$1
-    printf '%s\n' "$CW_MARK_BEGIN"
+    local hook=$PANEFUL_HOOK_LINK_DIR/hook.$1
+    printf '%s\n' "$PANEFUL_MARK_BEGIN"
     if [ "$1" = fish ]; then
         printf 'test -f %s; and source %s\n' "$hook" "$hook"
     else
         printf '[ -f "%s" ] && . "%s"\n' "$hook" "$hook"
     fi
-    printf '%s\n' "$CW_MARK_END"
+    printf '%s\n' "$PANEFUL_MARK_END"
 }
 
-rc_has_block() { grep -qF "$CW_MARK_BEGIN" "$1" 2>/dev/null; }
+rc_has_block() { grep -qF "$PANEFUL_MARK_BEGIN" "$1" 2>/dev/null; }
 
 rc_strip_block() {   # $1 rc file
     [ -f "$1" ] || return 0
-    awk -v b="$CW_MARK_BEGIN" -v e="$CW_MARK_END" '
+    awk -v b="$PANEFUL_MARK_BEGIN" -v e="$PANEFUL_MARK_END" '
         index($0, b) { skip = 1 } !skip { print } index($0, e) { skip = 0 }' "$1" > "$1.cw-tmp" &&
         mv "$1.cw-tmp" "$1"
 }
 
 claude_hooks_json() {   # $1 bin path -> the merged settings
-    local src=$CW_CLAUDE_SETTINGS
+    local src=$PANEFUL_CLAUDE_SETTINGS
     [ -f "$src" ] || src=/dev/null
     jq --arg bin "$1" '
-        def mine: (.command // "") | test("claude-workspace hook");
+        def mine: (.command // "") | test("paneful hook");
         def clean($e): .hooks[$e] = ((.hooks[$e] // [])
             | map(.hooks = ((.hooks // []) | map(select(mine | not))))
             | map(select((.hooks // []) | length > 0)));
@@ -91,12 +91,12 @@ claude_hooks_json() {   # $1 bin path -> the merged settings
 }
 
 claude_hooks_installed() {
-    [ -f "$CW_CLAUDE_SETTINGS" ] || return 1
-    jq -e '[.hooks // {} | to_entries[] | .value[]? | .hooks[]? | select((.command // "") | test("claude-workspace hook"))] | length >= 3' \
-        "$CW_CLAUDE_SETTINGS" >/dev/null 2>&1
+    [ -f "$PANEFUL_CLAUDE_SETTINGS" ] || return 1
+    jq -e '[.hooks // {} | to_entries[] | .value[]? | .hooks[]? | select((.command // "") | test("paneful hook"))] | length >= 3' \
+        "$PANEFUL_CLAUDE_SETTINGS" >/dev/null 2>&1
 }
 
-bin_target() { printf '%s/claude-workspace' "${CW_BINDIR:-$HOME/.local/bin}"; }
+bin_target() { printf '%s/paneful' "${PANEFUL_BINDIR:-$HOME/.local/bin}"; }
 
 cmd_install() {
     local dry=0 norc=0 sh=""
@@ -114,12 +114,12 @@ cmd_install() {
     rc=$(rc_file_for "$sh")
     target=$(bin_target)
 
-    printf 'claude-workspace %s\n' "$CW_VERSION"
-    printf '  source:          %s\n' "$CW_ROOT"
+    printf 'paneful %s\n' "$PANEFUL_VERSION"
+    printf '  source:          %s\n' "$PANEFUL_ROOT"
     printf '  command:         %s\n' "$target"
-    printf '  shell hook:      %s  (into %s)\n' "$CW_SHELL_DIR/hook.$sh" "$rc"
-    printf '  Claude Code:     %s\n' "$CW_CLAUDE_SETTINGS"
-    printf '  state:           %s\n\n' "$CW_STATE_DIR"
+    printf '  shell hook:      %s  (into %s)\n' "$PANEFUL_SHELL_DIR/hook.$sh" "$rc"
+    printf '  Claude Code:     %s\n' "$PANEFUL_CLAUDE_SETTINGS"
+    printf '  state:           %s\n\n' "$PANEFUL_STATE_DIR"
 
     if [ "$dry" -eq 1 ]; then
         printf 'Would add to %s:\n' "$rc"
@@ -135,8 +135,8 @@ cmd_install() {
     if [ -e "$target" ] && [ ! -L "$target" ]; then
         log "$target exists and is not a symlink; leaving it alone"
     else
-        ln -sfn "$CW_BIN_DIR/claude-workspace" "$target"
-        printf 'linked  %s -> %s\n' "$target" "$CW_BIN_DIR/claude-workspace"
+        ln -sfn "$PANEFUL_BIN_DIR/paneful" "$target"
+        printf 'linked  %s -> %s\n' "$target" "$PANEFUL_BIN_DIR/paneful"
     fi
     case ":$PATH:" in
         *":$(dirname "$target"):"*) ;;
@@ -145,7 +145,7 @@ cmd_install() {
 
     # 2. the shell hook, reachable at a stable path
     link_hooks
-    printf 'linked  %s/hook.* -> %s\n' "$CW_HOOK_LINK_DIR" "$CW_SHELL_DIR"
+    printf 'linked  %s/hook.* -> %s\n' "$PANEFUL_HOOK_LINK_DIR" "$PANEFUL_SHELL_DIR"
     if [ "$norc" -eq 1 ]; then
         printf 'skipped %s (--no-rc); source this yourself:\n' "$rc"
         rc_block "$sh" | sed -n '2p' | sed 's/^/    /'
@@ -162,19 +162,19 @@ cmd_install() {
     fi
 
     # 3. the Claude Code hooks that keep the snapshot fresh
-    if [ -d "$(dirname "$CW_CLAUDE_SETTINGS")" ]; then
+    if [ -d "$(dirname "$PANEFUL_CLAUDE_SETTINGS")" ]; then
         local merged backup
         merged=$(claude_hooks_json "$target")
         if [ -n "$merged" ] && [ "$merged" != '{}' ]; then
-            if [ -f "$CW_CLAUDE_SETTINGS" ]; then
-                backup=$CW_CLAUDE_SETTINGS.cw-backup-$(date +%Y%m%d-%H%M%S)
-                cp "$CW_CLAUDE_SETTINGS" "$backup"
+            if [ -f "$PANEFUL_CLAUDE_SETTINGS" ]; then
+                backup=$PANEFUL_CLAUDE_SETTINGS.cw-backup-$(date +%Y%m%d-%H%M%S)
+                cp "$PANEFUL_CLAUDE_SETTINGS" "$backup"
                 printf 'backed up %s\n' "$backup"
             fi
-            printf '%s\n' "$merged" > "$CW_CLAUDE_SETTINGS"
-            printf 'hooked  %s (SessionStart, SessionEnd, UserPromptSubmit)\n' "$CW_CLAUDE_SETTINGS"
+            printf '%s\n' "$merged" > "$PANEFUL_CLAUDE_SETTINGS"
+            printf 'hooked  %s (SessionStart, SessionEnd, UserPromptSubmit)\n' "$PANEFUL_CLAUDE_SETTINGS"
         else
-            log "could not merge into $CW_CLAUDE_SETTINGS; add the hooks by hand (see the README)"
+            log "could not merge into $PANEFUL_CLAUDE_SETTINGS; add the hooks by hand (see the README)"
         fi
     else
         log "Claude Code is not set up here; skipped its hooks"
@@ -182,15 +182,15 @@ cmd_install() {
 
     # 4. learn the panes that are open right now, and take a first snapshot
     load snapshot terminal providers
-    if terminal_load 2>/dev/null && cwterm_present 2>/dev/null; then
+    if terminal_load 2>/dev/null && term_present 2>/dev/null; then
         cmd_map
-        "$CW_BIN_DIR/claude-workspace" save --force >/dev/null 2>&1 || true
+        "$PANEFUL_BIN_DIR/paneful" save --force >/dev/null 2>&1 || true
         printf 'mapped the open panes and saved a first snapshot\n'
     else
-        log "no supported terminal running; run 'claude-workspace map' once one is"
+        log "no supported terminal running; run 'paneful map' once one is"
     fi
 
-    printf '\nDone. Open a new tab to load the hook, then try: claude-workspace simulate\n'
+    printf '\nDone. Open a new tab to load the hook, then try: paneful simulate\n'
 }
 
 cmd_uninstall() {
@@ -199,36 +199,36 @@ cmd_uninstall() {
     rc=$(rc_file_for "$sh")
     target=$(bin_target)
     rc_strip_block "$rc" && printf 'cleaned %s\n' "$rc"
-    if [ -f "$CW_CLAUDE_SETTINGS" ]; then
+    if [ -f "$PANEFUL_CLAUDE_SETTINGS" ]; then
         local cleaned
         cleaned=$(jq '
-            def mine: (.command // "") | test("claude-workspace hook");
+            def mine: (.command // "") | test("paneful hook");
             def clean($e): .hooks[$e] = ((.hooks[$e] // [])
                 | map(.hooks = ((.hooks // []) | map(select(mine | not))))
                 | map(select((.hooks // []) | length > 0)));
             clean("SessionStart") | clean("SessionEnd") | clean("UserPromptSubmit")
             | .hooks |= with_entries(select((.value | length) > 0))
-        ' "$CW_CLAUDE_SETTINGS")
-        printf '%s\n' "$cleaned" > "$CW_CLAUDE_SETTINGS"
-        printf 'cleaned %s\n' "$CW_CLAUDE_SETTINGS"
+        ' "$PANEFUL_CLAUDE_SETTINGS")
+        printf '%s\n' "$cleaned" > "$PANEFUL_CLAUDE_SETTINGS"
+        printf 'cleaned %s\n' "$PANEFUL_CLAUDE_SETTINGS"
     fi
     [ -L "$target" ] && rm "$target" && printf 'removed %s\n' "$target"
-    if [ -d "$CW_HOOK_LINK_DIR" ]; then
-        rm -f "$CW_HOOK_LINK_DIR"/hook.*
-        rmdir "$CW_HOOK_LINK_DIR" 2>/dev/null
-        printf 'removed %s\n' "$CW_HOOK_LINK_DIR"
+    if [ -d "$PANEFUL_HOOK_LINK_DIR" ]; then
+        rm -f "$PANEFUL_HOOK_LINK_DIR"/hook.*
+        rmdir "$PANEFUL_HOOK_LINK_DIR" 2>/dev/null
+        printf 'removed %s\n' "$PANEFUL_HOOK_LINK_DIR"
     fi
-    printf '\nSnapshots and logs are still in %s (delete that directory to remove them).\n' "$CW_STATE_DIR"
+    printf '\nSnapshots and logs are still in %s (delete that directory to remove them).\n' "$PANEFUL_STATE_DIR"
 }
 
 # --- doctor ----------------------------------------------------------------
-CW_DOC_FAIL=0
+PANEFUL_DOC_FAIL=0
 ok()   { printf '  \033[32mok\033[0m    %s\n' "$*"; }
 warn() { printf '  \033[33mwarn\033[0m  %s\n' "$*"; }
-bad()  { printf '  \033[31mfail\033[0m  %s\n' "$*"; CW_DOC_FAIL=$((CW_DOC_FAIL + 1)); }
+bad()  { printf '  \033[31mfail\033[0m  %s\n' "$*"; PANEFUL_DOC_FAIL=$((PANEFUL_DOC_FAIL + 1)); }
 
 cmd_doctor() {
-    printf 'claude-workspace %s  (%s)\n\n' "$CW_VERSION" "$CW_ROOT"
+    printf 'paneful %s  (%s)\n\n' "$PANEFUL_VERSION" "$PANEFUL_ROOT"
 
     printf 'dependencies\n'
     if command -v jq >/dev/null; then ok "jq $(jq --version | sed 's/jq-//')"; else bad "jq is missing: brew install jq"; fi
@@ -237,18 +237,18 @@ cmd_doctor() {
 
     printf '\nterminal\n'
     if terminal_load 2>/dev/null; then
-        ok "$cwterm_label $(cwterm_version 2>/dev/null) via the '$CW_TERM' adapter"
-        if cwterm_present 2>/dev/null; then
+        ok "$term_label $(term_version 2>/dev/null) via the '$PANEFUL_TERM' adapter"
+        if term_present 2>/dev/null; then
             local panes
-            panes=$(cwterm_dump 2>/dev/null | grep -c $'^S\t' || true)
+            panes=$(term_dump 2>/dev/null | grep -c $'^S\t' || true)
             ok "$panes pane(s) visible to the adapter"
         else
-            bad "$cwterm_label is not answering; is it running?"
+            bad "$term_label is not answering; is it running?"
         fi
-        printf '  info  capabilities: %s\n' "$cwterm_caps"
+        printf '  info  capabilities: %s\n' "$term_caps"
         terminal_has bounds || printf '  info  window position and size are not restorable with this adapter\n'
     else
-        bad "no supported terminal detected (${CW_TERMINALS})"
+        bad "no supported terminal detected (${PANEFUL_TERMINALS})"
     fi
 
     printf '\nshell integration\n'
@@ -257,22 +257,22 @@ cmd_doctor() {
     # The only answer that matters is whether a freshly started shell ends up
     # with the hook loaded, however it got there: the rc block this tool writes,
     # a dotfiles repo that sources it, or anything else.
-    loaded=$("$SHELL" -ic 'printf %s "${CW_HOOK_LOADED:-}"' 2>/dev/null | tr -d '[:space:]')
+    loaded=$("$SHELL" -ic 'printf %s "${PANEFUL_HOOK_LOADED:-}"' 2>/dev/null | tr -d '[:space:]')
     if [ -n "$loaded" ]; then
         ok "a new $sh shell loads the hook"
     elif rc_has_block "$rc"; then
         warn "the hook is in $(short "$rc") but a new shell did not load it"
     else
-        bad "a new $sh shell does not load the hook: run claude-workspace install"
+        bad "a new $sh shell does not load the hook: run paneful install"
     fi
-    [ -n "${CW_HOOK_LOADED:-}" ] || printf '  info  this shell predates the hook; that is normal until you open a new tab\n'
+    [ -n "${PANEFUL_HOOK_LOADED:-}" ] || printf '  info  this shell predates the hook; that is normal until you open a new tab\n'
     if [ -n "${TTY:-}" ] || [ -t 0 ]; then
         local mytty
         mytty=$(ps -o tty= -p $$ | tr -d ' ')
-        if [ -f "$CW_TTY_DIR/$mytty" ]; then
-            ok "this pane is mapped ($mytty -> $(cat "$CW_TTY_DIR/$mytty" | cut -c1-8))"
+        if [ -f "$PANEFUL_TTY_DIR/$mytty" ]; then
+            ok "this pane is mapped ($mytty -> $(cat "$PANEFUL_TTY_DIR/$mytty" | cut -c1-8))"
         else
-            warn "this pane ($mytty) is not mapped yet; run claude-workspace map"
+            warn "this pane ($mytty) is not mapped yet; run paneful map"
         fi
     fi
     prune_tty_map
@@ -281,7 +281,7 @@ cmd_doctor() {
     printf '\nagent providers\n'
     providers_load
     local id n=0
-    for id in $CW_PROVIDER_IDS; do
+    for id in $PANEFUL_PROVIDER_IDS; do
         if provider_call "$id" available 2>/dev/null; then
             if provider_call "$id" live 2>/dev/null; then
                 ok "$(provider_call "$id" label): installed, running sessions are tracked"
@@ -292,36 +292,36 @@ cmd_doctor() {
         fi
     done
     [ "$n" -gt 0 ] || warn "no provider can track running sessions; panes will be restored by replaying commands"
-    printf '  info  replay policy for ordinary commands: %s\n' "$CW_REPLAY_POLICY"
+    printf '  info  replay policy for ordinary commands: %s\n' "$PANEFUL_REPLAY_POLICY"
 
     printf '\nautomatic snapshots\n'
     if claude_hooks_installed; then
-        ok "Claude Code hooks are in $(short "$CW_CLAUDE_SETTINGS")"
-    elif [ -f "$CW_CLAUDE_SETTINGS" ]; then
-        bad "Claude Code hooks are missing: run claude-workspace install"
+        ok "Claude Code hooks are in $(short "$PANEFUL_CLAUDE_SETTINGS")"
+    elif [ -f "$PANEFUL_CLAUDE_SETTINGS" ]; then
+        bad "Claude Code hooks are missing: run paneful install"
     else
-        warn "no $(short "$CW_CLAUDE_SETTINGS"); snapshots will only be taken when a new pane opens"
+        warn "no $(short "$PANEFUL_CLAUDE_SETTINGS"); snapshots will only be taken when a new pane opens"
     fi
-    if [ -f "$CW_LATEST" ]; then
+    if [ -f "$PANEFUL_LATEST" ]; then
         local age
-        age=$(( ($(date +%s) - $(stat -f %m "$CW_LATEST")) / 60 ))
+        age=$(( ($(date +%s) - $(stat -f %m "$PANEFUL_LATEST")) / 60 ))
         if [ "$age" -lt 240 ]; then ok "latest snapshot is ${age}m old"; else warn "latest snapshot is ${age}m old"; fi
-        jq -r '"  info  \(.counts.tabs) tabs, \(.counts.terminals) panes, \(.counts.sessions) sessions, \(.counts.placed) paired to a pane"' "$CW_LATEST"
-        if [ "$(jq '.counts.unplaced' "$CW_LATEST")" -gt 0 ]; then
-            warn "$(jq -r '.counts.unplaced' "$CW_LATEST") session(s) are not paired with a pane; run claude-workspace map"
+        jq -r '"  info  \(.counts.tabs) tabs, \(.counts.terminals) panes, \(.counts.sessions) sessions, \(.counts.placed) paired to a pane"' "$PANEFUL_LATEST"
+        if [ "$(jq '.counts.unplaced' "$PANEFUL_LATEST")" -gt 0 ]; then
+            warn "$(jq -r '.counts.unplaced' "$PANEFUL_LATEST") session(s) are not paired with a pane; run paneful map"
         fi
     else
-        bad "no snapshot yet: run claude-workspace save"
+        bad "no snapshot yet: run paneful save"
     fi
     if restore_pending 2>/dev/null; then
-        warn "a restore is pending; run claude-workspace restore, or dismiss to drop it"
+        warn "a restore is pending; run paneful restore, or dismiss to drop it"
     fi
 
     printf '\n'
-    if [ "$CW_DOC_FAIL" -eq 0 ]; then
-        printf 'All good. `claude-workspace simulate` shows what a relaunch would do.\n'
+    if [ "$PANEFUL_DOC_FAIL" -eq 0 ]; then
+        printf 'All good. `paneful simulate` shows what a relaunch would do.\n'
     else
-        printf '%s problem(s) above need fixing.\n' "$CW_DOC_FAIL"
+        printf '%s problem(s) above need fixing.\n' "$PANEFUL_DOC_FAIL"
         return 1
     fi
 }

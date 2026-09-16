@@ -1,15 +1,15 @@
-# claude-workspace
+# paneful
 
 Put your terminal back exactly as you left it, coding agents and all.
 
 You quit your terminal, or it crashes, or the machine reboots. The tabs come
 back, maybe. The seven Claude Code sessions that were running in them do not.
-`claude-workspace` snapshots the window, tab and split layout together with the
+`paneful` snapshots the window, tab and split layout together with the
 agent session living in each pane, and puts all of it back. There is nothing to
 type: each pane resumes its own session at its first prompt.
 
 ```
-$ claude-workspace simulate
+$ paneful simulate
 Snapshot latest from 2026-09-15 19:21 [Ghostty 1.3.1]: 7 tabs, 15 panes, 13 sessions.
 
 A. Ghostty restored the layout itself (a quit or a reboot). Each pane at its first prompt:
@@ -38,13 +38,13 @@ and busy panes.
 ## Install
 
 ```sh
-brew install --HEAD mikeyfarina/tap/claude-workspace
-claude-workspace install
-claude-workspace doctor
+brew install --HEAD mikeyfarina/tap/paneful
+paneful install
+paneful doctor
 ```
 
 `--HEAD` is required until the first tagged release. Or clone it and run
-`./bin/claude-workspace install` from the checkout.
+`./bin/paneful install` from the checkout.
 
 `install` links the command onto your `PATH`, adds one line to your shell rc,
 registers three Claude Code hooks so snapshots stay fresh on their own, learns
@@ -61,13 +61,13 @@ The commands are there for when you want to look:
 
 | Command | What it does |
 | --- | --- |
-| `claude-workspace simulate` | What every pane would do after a relaunch. Changes nothing. |
-| `claude-workspace doctor` | Checks every moving part and says how to fix what is broken. |
-| `claude-workspace status` | What the latest snapshot holds. |
-| `claude-workspace log` | What the automatic and manual restores actually did, and why. |
-| `claude-workspace diff` | How the live terminal differs from a snapshot. |
-| `claude-workspace restore` | Fill in anything a relaunch missed. |
-| `claude-workspace save --name before-refactor` | Keep a named snapshot to come back to. |
+| `paneful simulate` | What every pane would do after a relaunch. Changes nothing. |
+| `paneful doctor` | Checks every moving part and says how to fix what is broken. |
+| `paneful status` | What the latest snapshot holds. |
+| `paneful log` | What the automatic and manual restores actually did, and why. |
+| `paneful diff` | How the live terminal differs from a snapshot. |
+| `paneful restore` | Fill in anything a relaunch missed. |
+| `paneful save --name before-refactor` | Keep a named snapshot to come back to. |
 
 Every restore explains itself per pane: the exact command it types, or the
 reason it typed nothing, including the pid of the session that is already
@@ -76,12 +76,12 @@ running.
 ## Panes that were not running an agent
 
 A pane running `npm run dev` or `tail -f` is recorded too. What happens to it
-on restore is up to `CW_REPLAY_POLICY`:
+on restore is up to `PANEFUL_REPLAY_POLICY`:
 
 | Policy | Behaviour |
 | --- | --- |
 | `prompt` (default) | The command is typed into the pane but not run. Press Enter. |
-| `auto` | Run it if it matches `CW_REPLAY_ALLOW`, otherwise type it and wait. |
+| `auto` | Run it if it matches `PANEFUL_REPLAY_ALLOW`, otherwise type it and wait. |
 | `all` | Run whatever it was. |
 | `off` | Ignore it; the pane comes back as a plain shell. |
 
@@ -94,7 +94,7 @@ happened to be the last thing in a pane is not a feature.
 built against; tmux 3.7 is verified too, and needs no OSC 7 probe because tmux
 reports each pane's tty itself. The kitty, WezTerm and iTerm2 adapters were
 written from each project's documentation and have not been run against the
-real thing. `claude-workspace terminals` says which is which rather than
+real thing. `paneful terminals` says which is which rather than
 leaving you to find out.
 
 **Agents.** Claude Code is exact: the session id is recovered and resumed.
@@ -103,20 +103,20 @@ against the rollout files under `~/.codex/sessions`. Cursor CLI, Gemini CLI,
 Aider and opencode have no live session registry to read, so those panes come
 back with the agent's own "carry on from this directory" command
 (`gemini --resume`, `aider --restore-chat-history`, `opencode --continue`).
-`claude-workspace providers` lists what your machine has.
+`paneful providers` lists what your machine has.
 
 ## Configuration
 
-`~/.config/claude-workspace/config`, sourced as shell:
+`~/.config/paneful/config`, sourced as shell:
 
 ```sh
-CW_REPLAY_POLICY=auto        # off | prompt | auto | all
-CW_RESTORE_BOUNDS=1          # put the window back where it was
-CW_HISTORY_KEEP=40           # rolling automatic snapshots to keep
-CW_TERMINAL=ghostty          # force an adapter instead of detecting one
+PANEFUL_REPLAY_POLICY=auto        # off | prompt | auto | all
+PANEFUL_RESTORE_BOUNDS=1          # put the window back where it was
+PANEFUL_HISTORY_KEEP=40           # rolling automatic snapshots to keep
+PANEFUL_TERMINAL=ghostty          # force an adapter instead of detecting one
 ```
 
-State lives in `~/.local/state/claude-workspace`: snapshots, a rolling history,
+State lives in `~/.local/state/paneful`: snapshots, a rolling history,
 the pane map and the activity log. Nothing leaves your machine, and nothing runs
 in the background: every trigger is one short process that exits.
 

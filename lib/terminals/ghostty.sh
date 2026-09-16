@@ -1,13 +1,13 @@
 # shellcheck shell=bash
-# cwterm_* values are read by the loader in lib/terminal.sh.
+# term_* values are read by the loader in lib/terminal.sh.
 # shellcheck disable=SC2034
 # Ghostty adapter. Uses the AppleScript dictionary shipped in Ghostty 1.3,
 # which exposes windows > tabs > terminals with stable ids, and can create
 # windows, tabs and splits with a starting directory and environment.
 
-cwterm_label="Ghostty"
-cwterm_caps="env bounds tabtitle split type"
-cwterm_verified="verified against Ghostty 1.3"
+term_label="Ghostty"
+term_caps="env bounds tabtitle split type"
+term_verified="verified against Ghostty 1.3"
 
 _gt_app=""
 _gt_exe=""
@@ -25,10 +25,10 @@ _gt_pid() {
     ps -axo pid=,comm= | awk -v exe="$_gt_exe" '$2 == exe { print $1 }' | sed -n '1p'
 }
 
-cwterm_present() { [ -n "$(_gt_pid)" ]; }
-cwterm_current() { [ "${TERM_PROGRAM:-}" = ghostty ] && cwterm_present; }
+term_present() { [ -n "$(_gt_pid)" ]; }
+term_current() { [ "${TERM_PROGRAM:-}" = ghostty ] && term_present; }
 
-cwterm_version() {
+term_version() {
     if [ -n "${TERM_PROGRAM_VERSION:-}" ] && [ "${TERM_PROGRAM:-}" = ghostty ]; then
         printf '%s' "$TERM_PROGRAM_VERSION"
         return 0
@@ -39,7 +39,7 @@ cwterm_version() {
 
 # When Ghostty itself restored the layout, this is the launch we are restoring
 # into; the epoch tells a snapshot whether it predates the running instance.
-cwterm_start_epoch() {
+term_start_epoch() {
     local pid lstart
     pid=$(_gt_pid) || return 1
     [ -n "$pid" ] || return 1
@@ -47,8 +47,8 @@ cwterm_start_epoch() {
     date -j -f '%a %b %d %H:%M:%S %Y' "$lstart" '+%s' 2>/dev/null
 }
 
-cwterm_launch() {
-    cwterm_present && return 0
+term_launch() {
+    term_present && return 0
     log "starting Ghostty"
     open -a Ghostty
     local i
@@ -59,7 +59,7 @@ cwterm_launch() {
     die "Ghostty did not become scriptable"
 }
 
-cwterm_dump() {
+term_dump() {
     osa 15 <<'APPLESCRIPT'
 -- inside a Ghostty tell block the word "tab" is the tab class, not a character
 set tabChar to character id 9
@@ -90,7 +90,7 @@ end tell
 APPLESCRIPT
 }
 
-cwterm_find_pane() {   # $1 directory
+term_find_pane() {   # $1 directory
     osa 5 <<EOF
 tell application "Ghostty"
     repeat with s in terminals
@@ -103,14 +103,14 @@ end tell
 EOF
 }
 
-cwterm_ttys() {
+term_ttys() {
     local pid
     pid=$(_gt_pid)
     [ -n "$pid" ] || return 0
     ps -axo ppid=,tty= | awk -v g="$pid" '$1 == g && $2 != "??" { print $2 }' | sort -u
 }
 
-cwterm_type() {   # $1 paneId, $2 text, $3 submit 0|1
+term_type() {   # $1 paneId, $2 text, $3 submit 0|1
     {
         printf 'tell application "Ghostty"\n'
         printf '    input text %s to terminal id %s\n' "$(as_str "$2")" "$(as_str "$1")"
@@ -119,7 +119,7 @@ cwterm_type() {   # $1 paneId, $2 text, $3 submit 0|1
     } | osa 30 >/dev/null
 }
 
-cwterm_set_tab_title() {   # $1 paneId, $2 title
+term_set_tab_title() {   # $1 paneId, $2 title
     osa 10 <<EOF >/dev/null
 tell application "Ghostty" to perform action $(as_str "set_tab_title:$2") on terminal id $(as_str "$1")
 EOF
@@ -127,7 +127,7 @@ EOF
 
 # Ghostty's dictionary does not expose window geometry, so this reads and
 # writes it through the Accessibility API. Silent when permission is missing.
-cwterm_bounds() {
+term_bounds() {
     osascript <<'APPLESCRIPT' 2>/dev/null || true
 set tabChar to character id 9
 set out to ""
@@ -149,7 +149,7 @@ return out
 APPLESCRIPT
 }
 
-cwterm_apply_bounds() {   # $1 window index (frontmost is 1), $2 x, $3 y, $4 w, $5 h
+term_apply_bounds() {   # $1 window index (frontmost is 1), $2 x, $3 y, $4 w, $5 h
     osascript <<APPLESCRIPT >/dev/null 2>&1 || true
 tell application "System Events"
     if not (exists process "Ghostty") then return
@@ -165,23 +165,23 @@ APPLESCRIPT
 _gt_config() {   # $1 cwd, $2 run, $3 prefill
     local cfg env=""
     cfg="{initial working directory:$(as_str "$1")"
-    [ -n "$2" ] && env="$(as_str "$CW_ENV_RUN=$2")"
+    [ -n "$2" ] && env="$(as_str "$PANEFUL_ENV_RUN=$2")"
     if [ -n "$3" ]; then
         [ -n "$env" ] && env="$env, "
-        env="$env$(as_str "$CW_ENV_PREFILL=$3")"
+        env="$env$(as_str "$PANEFUL_ENV_PREFILL=$3")"
     fi
     [ -n "$env" ] && cfg="$cfg, environment variables:{$env}"
     printf '%s}' "$cfg"
 }
 
-cwterm_build() {
+term_build() {
     local plan chunk line kind
     plan=$(cat)
     # One AppleScript per window keeps each run inside a sane timeout.
     local -a windows=()
     chunk=""
     while IFS= read -r line; do
-        kind=${line%%"$CW_US"*}
+        kind=${line%%"$PANEFUL_US"*}
         if [ "$kind" = W ] && [ -n "$chunk" ]; then
             windows+=("$chunk"); chunk=""
         fi
@@ -202,7 +202,7 @@ _gt_build_window() {   # $1 plan chunk for one window
     local pane=0 tabno=0 sel=1
     while IFS= read -r line; do
         [ -n "$line" ] || continue
-        IFS=$CW_US read -r kind a b c d e <<<"$line"
+        IFS=$PANEFUL_US read -r kind a b c d e <<<"$line"
         case $kind in
             W)
                 cwd=$a; run=$b; prefill=$c; pane=0; tabno=1
@@ -210,20 +210,20 @@ _gt_build_window() {   # $1 plan chunk for one window
                 script+="    set tb to tab 1 of w"$'\n'
                 script+="    set s0 to terminal 1 of tb"$'\n'
                 script+="    set out to out & (id of s0) & linefeed"$'\n    delay 0.25\n'
-                meta+=("$cwd$CW_US$run$CW_US$prefill")
+                meta+=("$cwd$PANEFUL_US$run$PANEFUL_US$prefill")
                 ;;
             T)
                 cwd=$a; run=$b; prefill=$c; pane=0; tabno=$((tabno + 1))
                 script+="    set tb to new tab in w with configuration $(_gt_config "$cwd" "$run" "$prefill")"$'\n'
                 script+="    set s0 to terminal 1 of tb"$'\n'
                 script+="    set out to out & (id of s0) & linefeed"$'\n    delay 0.25\n'
-                meta+=("$cwd$CW_US$run$CW_US$prefill")
+                meta+=("$cwd$PANEFUL_US$run$PANEFUL_US$prefill")
                 ;;
             P)
                 dir=$a; from=$b; cwd=$c; run=$d; prefill=$e; pane=$((pane + 1))
                 script+="    set s$pane to split s$from direction $dir with configuration $(_gt_config "$cwd" "$run" "$prefill")"$'\n'
                 script+="    set out to out & (id of s$pane) & linefeed"$'\n    delay 0.25\n'
-                meta+=("$cwd$CW_US$run$CW_US$prefill")
+                meta+=("$cwd$PANEFUL_US$run$PANEFUL_US$prefill")
                 ;;
             N)
                 title=$a
@@ -246,7 +246,7 @@ _gt_build_window() {   # $1 plan chunk for one window
     ids=$(osa 300 <<<"$script") || return 1
     while IFS= read -r line; do
         [ -n "$line" ] || continue
-        printf '%s%s%s\n' "$line" "$CW_US" "${meta[$i]}"
+        printf '%s%s%s\n' "$line" "$PANEFUL_US" "${meta[$i]}"
         i=$((i + 1))
     done <<<"$ids"
 }

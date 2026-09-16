@@ -1,8 +1,8 @@
 # shellcheck shell=bash
-# cwterm_* values are read by the loader in lib/terminal.sh.
+# term_* values are read by the loader in lib/terminal.sh.
 # shellcheck disable=SC2034
 # iTerm2 adapter, written from the AppleScript documentation and not yet
-# exercised against a running iTerm2. `claude-workspace terminals` says so.
+# exercised against a running iTerm2. `paneful terminals` says so.
 #
 # iTerm2's AppleScript exposes each session's tty, which makes the pane map
 # exact with no probe. What it does not expose is a starting directory or an
@@ -10,33 +10,33 @@
 # command is typed in afterwards rather than handed over in the environment.
 #
 # Needs "Enable AppleScript" in iTerm2's preferences, and macOS Automation
-# permission for whatever is running claude-workspace.
+# permission for whatever is running paneful.
 
-cwterm_label="iTerm2"
-cwterm_caps="tabtitle split type"
-cwterm_verified="from documentation"
-CW_NATIVE_TTY_MAP=1
+term_label="iTerm2"
+term_caps="tabtitle split type"
+term_verified="from documentation"
+PANEFUL_NATIVE_TTY_MAP=1
 
-cwterm_present() { osascript -e 'tell application "iTerm2" to count windows' >/dev/null 2>&1; }
-cwterm_current() { [ -n "${ITERM_SESSION_ID:-}" ] && cwterm_present; }
-cwterm_version() { osascript -e 'tell application "iTerm2" to get version' 2>/dev/null; }
-cwterm_start_epoch() {
+term_present() { osascript -e 'tell application "iTerm2" to count windows' >/dev/null 2>&1; }
+term_current() { [ -n "${ITERM_SESSION_ID:-}" ] && term_present; }
+term_version() { osascript -e 'tell application "iTerm2" to get version' 2>/dev/null; }
+term_start_epoch() {
     local pid
     pid=$(ps -axo pid=,comm= | awk '$2 ~ /iTerm2$/ { print $1 }' | sed -n '1p')
     [ -n "$pid" ] || return 1
     date -j -f '%a %b %d %H:%M:%S %Y' "$(ps -o lstart= -p "$pid" | sed 's/ *$//')" '+%s' 2>/dev/null
 }
-cwterm_launch() {
-    cwterm_present && return 0
+term_launch() {
+    term_present && return 0
     open -a iTerm
     local i
-    for (( i = 0; i < 40; i++ )); do sleep 0.5; cwterm_present && return 0; done
+    for (( i = 0; i < 40; i++ )); do sleep 0.5; term_present && return 0; done
     die "iTerm2 did not answer AppleScript (is AppleScript enabled in its preferences?)"
 }
 
 # iTerm2 reports a session's tty but not its working directory, so the
 # directory is read from the shell on that tty instead.
-cwterm_dump() {
+term_dump() {
     local raw wi ti id tty cwd title
     raw=$(osa 15 <<'APPLESCRIPT'
 set tabChar to character id 9
@@ -70,7 +70,7 @@ APPLESCRIPT
     done <<<"$raw"
 }
 
-cwterm_tty_pairs() {
+term_tty_pairs() {
     osa 15 <<'APPLESCRIPT' | awk -F'\t' '{ sub("^/dev/", "", $1); print $1 "\t" $2 }'
 set tabChar to character id 9
 set out to ""
@@ -86,11 +86,11 @@ end tell
 return out
 APPLESCRIPT
 }
-cwterm_pane_for_tty() { cwterm_tty_pairs | awk -F'\t' -v t="$1" '$1 == t { print $2; exit }'; }
-cwterm_ttys() { cwterm_tty_pairs | cut -f1; }
-cwterm_find_pane() { cwterm_dump | awk -F'\t' -v d="$1" '$1 == "S" && $5 == d { print $4; exit }'; }
+term_pane_for_tty() { term_tty_pairs | awk -F'\t' -v t="$1" '$1 == t { print $2; exit }'; }
+term_ttys() { term_tty_pairs | cut -f1; }
+term_find_pane() { term_dump | awk -F'\t' -v d="$1" '$1 == "S" && $5 == d { print $4; exit }'; }
 
-cwterm_type() {   # $1 paneId, $2 text, $3 submit
+term_type() {   # $1 paneId, $2 text, $3 submit
     osa 30 <<EOF >/dev/null
 tell application "iTerm2"
     repeat with w in windows
@@ -107,7 +107,7 @@ end tell
 EOF
 }
 
-cwterm_set_tab_title() {   # $1 paneId, $2 title
+term_set_tab_title() {   # $1 paneId, $2 title
     osa 10 <<EOF >/dev/null
 tell application "iTerm2"
     repeat with w in windows
@@ -125,8 +125,8 @@ EOF
 }
 
 # Geometry is not reachable from iTerm2's AppleScript dictionary.
-cwterm_bounds() { :; }
-cwterm_apply_bounds() { :; }
+term_bounds() { :; }
+term_apply_bounds() { :; }
 
 _it_create() {   # $1 kind (window|tab|right|down), $2 fromPaneId, $3 cwd -> new pane id
     local script
@@ -150,28 +150,28 @@ end tell
 EOF
 }
 
-cwterm_build() {
+term_build() {
     local line kind a b c d e cwd run prefill dir from pane_id
     local -a panes=()
     while IFS= read -r line; do
         [ -n "$line" ] || continue
-        IFS=$CW_US read -r kind a b c d e <<<"$line"
+        IFS=$PANEFUL_US read -r kind a b c d e <<<"$line"
         case $kind in
             W|T)
                 cwd=$a; run=$b; prefill=$c
                 panes=()
                 pane_id=$(_it_create "$([ "$kind" = W ] && echo window || echo tab)" "" "$cwd")
                 panes=("$pane_id")
-                printf '%s%s%s%s%s%s%s\n' "$pane_id" "$CW_US" "$cwd" "$CW_US" "$run" "$CW_US" "$prefill"
+                printf '%s%s%s%s%s%s%s\n' "$pane_id" "$PANEFUL_US" "$cwd" "$PANEFUL_US" "$run" "$PANEFUL_US" "$prefill"
                 ;;
             P)
                 dir=$a; from=$b; cwd=$c; run=$d; prefill=$e
                 pane_id=$(_it_create "$dir" "${panes[$from]}" "$cwd")
                 panes+=("$pane_id")
-                printf '%s%s%s%s%s%s%s\n' "$pane_id" "$CW_US" "$cwd" "$CW_US" "$run" "$CW_US" "$prefill"
+                printf '%s%s%s%s%s%s%s\n' "$pane_id" "$PANEFUL_US" "$cwd" "$PANEFUL_US" "$run" "$PANEFUL_US" "$prefill"
                 ;;
             N)
-                [ -n "${panes[0]:-}" ] && cwterm_set_tab_title "${panes[0]}" "$a"
+                [ -n "${panes[0]:-}" ] && term_set_tab_title "${panes[0]}" "$a"
                 ;;
         esac
     done

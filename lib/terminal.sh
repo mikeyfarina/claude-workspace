@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# cwterm_* comes from whichever adapter is loaded at run time; CW_TERM and the
+# term_* comes from whichever adapter is loaded at run time; PANEFUL_TERM and the
 # trap path are read by other files, and the trap must expand its path now.
 # shellcheck disable=SC2154,SC2034,SC2064
 # Terminal adapters: detection, loading, and the parts that are the same
@@ -7,18 +7,18 @@
 #
 # An adapter lives in lib/terminals/<id>.sh and defines:
 #
-#   cwterm_label            human name, e.g. "Ghostty"
-#   cwterm_caps             space separated: env bounds tabtitle split type
-#   cwterm_present()        0 when this terminal is running and controllable
-#   cwterm_current()        0 when the calling shell is inside this terminal
-#   cwterm_version()        version string, best effort
-#   cwterm_launch()         start it and wait until it answers
-#   cwterm_dump()           layout as TSV, see below
-#   cwterm_find_pane(dir)   pane id currently reporting that directory
-#   cwterm_bounds()         WB <windowIndex> <x> <y> <w> <h>
-#   cwterm_apply_bounds()   <windowIndex> <x> <y> <w> <h>
-#   cwterm_type()           <paneId> <text> <submit 0|1>
-#   cwterm_build()          reads a plan on stdin, prints one created pane per
+#   term_label            human name, e.g. "Ghostty"
+#   term_caps             space separated: env bounds tabtitle split type
+#   term_present()        0 when this terminal is running and controllable
+#   term_current()        0 when the calling shell is inside this terminal
+#   term_version()        version string, best effort
+#   term_launch()         start it and wait until it answers
+#   term_dump()           layout as TSV, see below
+#   term_find_pane(dir)   pane id currently reporting that directory
+#   term_bounds()         WB <windowIndex> <x> <y> <w> <h>
+#   term_apply_bounds()   <windowIndex> <x> <y> <w> <h>
+#   term_type()           <paneId> <text> <submit 0|1>
+#   term_build()          reads a plan on stdin, prints one created pane per
 #                           line: <paneId> TAB <cwd> TAB <run> TAB <prefill>
 #
 # Layout TSV rows:
@@ -37,46 +37,46 @@
 # it should type without executing. Adapters without the "env" capability get
 # them typed in afterwards by restore.sh instead.
 
-CW_TERMINALS="ghostty kitty wezterm iterm2 tmux"
+PANEFUL_TERMINALS="ghostty kitty wezterm iterm2 tmux"
 
 # Adapters are plain sourced files, so anything one of them sets has to be
 # cleared before the next is tried.
-_terminal_reset() { CW_NATIVE_TTY_MAP=""; }
+_terminal_reset() { PANEFUL_NATIVE_TTY_MAP=""; }
 
 # The adapter id is optional; callers that omit it get detection.
 # shellcheck disable=SC2120
 terminal_load() {   # $1 optional adapter id
-    local want=${1:-$CW_TERMINAL} id
+    local want=${1:-$PANEFUL_TERMINAL} id
     _terminal_reset
     if [ -n "$want" ]; then
-        [ -f "$CW_LIB/terminals/$want.sh" ] || die "no terminal adapter named '''$want'''"
+        [ -f "$PANEFUL_LIB/terminals/$want.sh" ] || die "no terminal adapter named '''$want'''"
         # shellcheck disable=SC1090
-        . "$CW_LIB/terminals/$want.sh"
-        CW_TERM=$want
+        . "$PANEFUL_LIB/terminals/$want.sh"
+        PANEFUL_TERM=$want
         return 0
     fi
     # Prefer the terminal this shell is running inside. tmux is asked first:
     # inside tmux the panes that matter are tmux's, even though TERM_PROGRAM
     # still names the GUI terminal underneath.
-    for id in tmux $CW_TERMINALS; do
-        [ -f "$CW_LIB/terminals/$id.sh" ] || continue
+    for id in tmux $PANEFUL_TERMINALS; do
+        [ -f "$PANEFUL_LIB/terminals/$id.sh" ] || continue
         _terminal_reset
         # shellcheck disable=SC1090
-        . "$CW_LIB/terminals/$id.sh"
-        if cwterm_current 2>/dev/null; then CW_TERM=$id; return 0; fi
+        . "$PANEFUL_LIB/terminals/$id.sh"
+        if term_current 2>/dev/null; then PANEFUL_TERM=$id; return 0; fi
     done
-    for id in $CW_TERMINALS; do
-        [ -f "$CW_LIB/terminals/$id.sh" ] || continue
+    for id in $PANEFUL_TERMINALS; do
+        [ -f "$PANEFUL_LIB/terminals/$id.sh" ] || continue
         _terminal_reset
         # shellcheck disable=SC1090
-        . "$CW_LIB/terminals/$id.sh"
-        if cwterm_present 2>/dev/null; then CW_TERM=$id; return 0; fi
+        . "$PANEFUL_LIB/terminals/$id.sh"
+        if term_present 2>/dev/null; then PANEFUL_TERM=$id; return 0; fi
     done
-    die "no supported terminal is running (looked for: $CW_TERMINALS)"
+    die "no supported terminal is running (looked for: $PANEFUL_TERMINALS)"
 }
 
 terminal_has() {   # $1 capability
-    case " $cwterm_caps " in *" $1 "*) return 0 ;; esac
+    case " $term_caps " in *" $1 "*) return 0 ;; esac
     return 1
 }
 
@@ -92,7 +92,7 @@ report_pwd() {   # $1 tty, $2 directory
 
 tty_map() {   # TSV: tty  paneId
     local f
-    for f in "$CW_TTY_DIR"/*; do
+    for f in "$PANEFUL_TTY_DIR"/*; do
         [ -e "$f" ] || continue
         printf '%s\t%s\n' "${f##*/}" "$(cat "$f")"
     done
@@ -101,7 +101,7 @@ tty_map() {   # TSV: tty  paneId
 prune_tty_map() {
     local live f
     live=$(ps -axo tty= | tr -d ' ' | sort -u)
-    for f in "$CW_TTY_DIR"/*; do
+    for f in "$PANEFUL_TTY_DIR"/*; do
         [ -e "$f" ] || continue
         grep -qx -- "${f##*/}" <<<"$live" || rm -- "$f"
     done
@@ -112,30 +112,30 @@ cmd_register_self() {   # $1 tty, $2 cwd
     local tty=${1#/dev/} cwd=$2 nonce dir pane
     terminal_load
     [ -c "/dev/$tty" ] || return 0
-    cwterm_present || return 0
-    if [ -n "${CW_NATIVE_TTY_MAP:-}" ]; then
+    term_present || return 0
+    if [ -n "${PANEFUL_NATIVE_TTY_MAP:-}" ]; then
         # The terminal can tell us directly; no probe needed.
-        pane=$(cwterm_pane_for_tty "$tty") || pane=""
+        pane=$(term_pane_for_tty "$tty") || pane=""
         [ -n "$pane" ] || return 0
-        printf '%s' "$pane" > "$CW_TTY_DIR/$tty"
+        printf '%s' "$pane" > "$PANEFUL_TTY_DIR/$tty"
         printf '%s\n' "$pane"
         return 0
     fi
     nonce=$(uuidgen | tr '[:upper:]' '[:lower:]')
-    dir=$CW_NONCE_DIR/$nonce
+    dir=$PANEFUL_NONCE_DIR/$nonce
     mkdir -p "$dir"
     # Expanded now: the trap fires after this function's locals are gone.
     trap "rmdir '$dir' 2>/dev/null" EXIT
     report_pwd "$tty" "$dir"
     sleep 0.1
-    pane=$(cwterm_find_pane "$dir")
+    pane=$(term_find_pane "$dir")
     if [ -z "$pane" ]; then
         sleep 0.4
-        pane=$(cwterm_find_pane "$dir")
+        pane=$(term_find_pane "$dir")
     fi
     report_pwd "$tty" "$cwd"
     [ -n "$pane" ] || return 0
-    printf '%s' "$pane" > "$CW_TTY_DIR/$tty"
+    printf '%s' "$pane" > "$PANEFUL_TTY_DIR/$tty"
     printf '%s\n' "$pane"
 }
 
@@ -152,40 +152,40 @@ shell_cwd_of_tty() {   # $1 tty
 cmd_map() {
     local before after ttys tty nonce dir pane prev mapped=0 total=0 pending=""
     terminal_load
-    cwterm_present || die "$cwterm_label is not running"
-    if [ -n "${CW_NATIVE_TTY_MAP:-}" ]; then
-        while IFS=$CW_US read -r tty pane; do
+    term_present || die "$term_label is not running"
+    if [ -n "${PANEFUL_NATIVE_TTY_MAP:-}" ]; then
+        while IFS=$PANEFUL_US read -r tty pane; do
             [ -n "$tty" ] || continue
-            printf '%s' "$pane" > "$CW_TTY_DIR/$tty"
+            printf '%s' "$pane" > "$PANEFUL_TTY_DIR/$tty"
             mapped=$((mapped + 1)); total=$((total + 1))
-        done < <(cwterm_tty_pairs | tr '\t' "$CW_US")
-        say "mapped $mapped of $total panes ($cwterm_label reports ttys itself)"
+        done < <(term_tty_pairs | tr '\t' "$PANEFUL_US")
+        say "mapped $mapped of $total panes ($term_label reports ttys itself)"
         return 0
     fi
-    before=$(cwterm_dump)
-    ttys=$(cwterm_ttys)
-    [ -n "$ttys" ] || die "no $cwterm_label panes found"
+    before=$(term_dump)
+    ttys=$(term_ttys)
+    [ -n "$ttys" ] || die "no $term_label panes found"
     for tty in $ttys; do
         nonce=$(uuidgen | tr '[:upper:]' '[:lower:]')
-        dir=$CW_NONCE_DIR/$nonce
+        dir=$PANEFUL_NONCE_DIR/$nonce
         mkdir -p "$dir"
         report_pwd "$tty" "$dir"
-        pending+="$tty$CW_US$dir"$'\n'
+        pending+="$tty$PANEFUL_US$dir"$'\n'
         total=$((total + 1))
     done
     sleep 0.5
-    after=$(cwterm_dump)
-    while IFS=$CW_US read -r tty dir; do
+    after=$(term_dump)
+    while IFS=$PANEFUL_US read -r tty dir; do
         [ -n "$tty" ] || continue
         pane=$(awk -F'\t' -v d="$dir" '$1 == "S" && $5 == d { print $4; exit }' <<<"$after")
         if [ -n "$pane" ]; then
             prev=$(awk -F'\t' -v id="$pane" '$1 == "S" && $4 == id { print $5; exit }' <<<"$before")
-            case $prev in "$CW_NONCE_DIR"/*|"") prev=$(shell_cwd_of_tty "$tty") ;; esac
+            case $prev in "$PANEFUL_NONCE_DIR"/*|"") prev=$(shell_cwd_of_tty "$tty") ;; esac
             [ -n "$prev" ] && report_pwd "$tty" "$prev"
-            printf '%s' "$pane" > "$CW_TTY_DIR/$tty"
+            printf '%s' "$pane" > "$PANEFUL_TTY_DIR/$tty"
             mapped=$((mapped + 1))
         else
-            log "$tty: $cwterm_label did not report the probe; left unmapped"
+            log "$tty: $term_label did not report the probe; left unmapped"
         fi
         rmdir "$dir" 2>/dev/null || true
     done <<<"$pending"
@@ -195,7 +195,7 @@ cmd_map() {
 # A pane is ready when its shell has reached a prompt: either it has registered
 # itself, or the terminal shows the shell's own title rather than a program's.
 pane_is_ready() {   # $1 paneId, $2 cwd, $3 layout TSV
-    grep -lqx -- "$1" "$CW_TTY_DIR"/* 2>/dev/null && return 0
+    grep -lqx -- "$1" "$PANEFUL_TTY_DIR"/* 2>/dev/null && return 0
     local title
     title=$(awk -F'\t' -v id="$1" '$1 == "S" && $4 == id { print $6; exit }' <<<"$3")
     [ "$title" = "$(short "$2")" ] || [ "$title" = "$2" ]
@@ -203,8 +203,8 @@ pane_is_ready() {   # $1 paneId, $2 cwd, $3 layout TSV
 
 wait_ready() {   # $1 paneId, $2 cwd
     local i live
-    for (( i = 0; i < CW_READY_TIMEOUT * 2; i++ )); do
-        live=$(cwterm_dump)
+    for (( i = 0; i < PANEFUL_READY_TIMEOUT * 2; i++ )); do
+        live=$(term_dump)
         pane_is_ready "$1" "$2" "$live" && return 0
         sleep 0.5
     done
@@ -218,17 +218,17 @@ screen_frames() {
 
 cmd_terminals() {
     local id label present current
-    for id in $CW_TERMINALS; do
-        [ -f "$CW_LIB/terminals/$id.sh" ] || { printf '%-9s %-22s not in this build\n' "$id" ""; continue; }
+    for id in $PANEFUL_TERMINALS; do
+        [ -f "$PANEFUL_LIB/terminals/$id.sh" ] || { printf '%-9s %-22s not in this build\n' "$id" ""; continue; }
         # shellcheck disable=SC1090
-        ( . "$CW_LIB/terminals/$id.sh"
+        ( . "$PANEFUL_LIB/terminals/$id.sh"
           present=no; current=no
-          cwterm_present 2>/dev/null && present=yes
-          cwterm_current 2>/dev/null && current=yes
-          label=$cwterm_label
+          term_present 2>/dev/null && present=yes
+          term_current 2>/dev/null && current=yes
+          label=$term_label
           printf '%-9s %-10s running: %-4s active: %-4s %-26s %s\n' \
-              "$id" "$label" "$present" "$current" "${cwterm_verified:-unverified}" "$cwterm_caps" )
+              "$id" "$label" "$present" "$current" "${term_verified:-unverified}" "$term_caps" )
     done
     printf '\nThe adapter is chosen by which terminal this shell runs inside, then by\n'
-    printf 'which one is running. Force one with CW_TERMINAL in %s.\n' "$(short "$CW_CONFIG_FILE")"
+    printf 'which one is running. Force one with PANEFUL_TERMINAL in %s.\n' "$(short "$PANEFUL_CONFIG_FILE")"
 }

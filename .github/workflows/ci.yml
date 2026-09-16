@@ -22,7 +22,7 @@ jobs:
             | tar -xJ --strip-components=1 -C /usr/local/bin "shellcheck-$version/shellcheck"
           shellcheck --version
       - name: Run shellcheck
-        run: shellcheck -x bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash
+        run: shellcheck -x bin/paneful lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash
 
   syntax:
     name: shell syntax
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: bash -n
         run: |
-          for f in bin/claude-workspace lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash; do
+          for f in bin/paneful lib/*.sh lib/terminals/*.sh lib/providers/*.sh shell/hook.bash; do
             bash -n "$f"
           done
       - name: zsh -n
@@ -49,6 +49,6 @@ jobs:
         # Homebrew only lints formulae that live in a tap, so put it in one.
         run: |
           brew tap-new local/ci --no-git
-          cp Formula/claude-workspace.rb "$(brew --repository)/Library/Taps/local/homebrew-ci/Formula/"
+          cp Formula/paneful.rb "$(brew --repository)/Library/Taps/local/homebrew-ci/Formula/"
           brew style local/ci
-          brew audit --strict local/ci/claude-workspace
+          brew audit --strict local/ci/paneful

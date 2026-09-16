@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# claude-workspace — put your terminal back exactly as you left it, agents and all.
+# paneful — put your terminal back exactly as you left it, agents and all.
 #
 # Snapshots the window/tab/split layout of a terminal together with the coding
 # agent session running in each pane, then brings all of it back after a quit,
-# a reboot or a crash. See `claude-workspace help`.
+# a reboot or a crash. See `paneful help`.
 # No `set -e`: this program is full of `[ cond ] && action` statements, and a
 # false condition at the wrong place would abort a restore halfway through.
 # Every call whose failure matters is checked explicitly instead.
@@ -17,25 +17,25 @@ while [ -L "$_cw_self" ]; do
     _cw_self=$(readlink "$_cw_self")
     case $_cw_self in /*) ;; *) _cw_self=$_cw_dir/$_cw_self ;; esac
 done
-CW_BIN_DIR=$(cd -P "$(dirname "$_cw_self")" && pwd)
-CW_ROOT=$(cd -P "$CW_BIN_DIR/.." && pwd)
+PANEFUL_BIN_DIR=$(cd -P "$(dirname "$_cw_self")" && pwd)
+PANEFUL_ROOT=$(cd -P "$PANEFUL_BIN_DIR/.." && pwd)
 unset _cw_self _cw_dir
 
 # Homebrew installs the payload under libexec; a clone keeps it alongside bin/.
-if [ -d "$CW_ROOT/lib/terminals" ]; then
-    CW_LIB=$CW_ROOT/lib
-    CW_SHELL_DIR=$CW_ROOT/shell
-elif [ -d "$CW_ROOT/libexec/lib/terminals" ]; then
-    CW_LIB=$CW_ROOT/libexec/lib
-    CW_SHELL_DIR=$CW_ROOT/libexec/shell
+if [ -d "$PANEFUL_ROOT/lib/terminals" ]; then
+    PANEFUL_LIB=$PANEFUL_ROOT/lib
+    PANEFUL_SHELL_DIR=$PANEFUL_ROOT/shell
+elif [ -d "$PANEFUL_ROOT/libexec/lib/terminals" ]; then
+    PANEFUL_LIB=$PANEFUL_ROOT/libexec/lib
+    PANEFUL_SHELL_DIR=$PANEFUL_ROOT/libexec/shell
 else
-    printf 'claude-workspace: cannot find lib/ next to %s\n' "$CW_BIN_DIR" >&2
+    printf 'paneful: cannot find lib/ next to %s\n' "$PANEFUL_BIN_DIR" >&2
     exit 1
 fi
-export CW_ROOT CW_LIB CW_SHELL_DIR
+export PANEFUL_ROOT PANEFUL_LIB PANEFUL_SHELL_DIR
 
 # shellcheck source=../lib/common.sh
-. "$CW_LIB/common.sh"
+. "$PANEFUL_LIB/common.sh"
 
 cmd=${1:-help}
 [ $# -gt 0 ] && shift
@@ -100,9 +100,9 @@ case $cmd in
         load terminal
         cmd_terminals "$@" ;;
     version|--version|-v)
-        printf 'claude-workspace %s\n' "$CW_VERSION" ;;
+        printf 'paneful %s\n' "$PANEFUL_VERSION" ;;
     help|--help|-h)
         cmd_help "$@" ;;
     *)
-        die "unknown command: $cmd (try: claude-workspace help)" ;;
+        die "unknown command: $cmd (try: paneful help)" ;;
 esac

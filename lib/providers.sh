@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# cwterm_* and provider_* functions come from the adapter and provider files
+# term_* and provider_* functions come from the adapter and provider files
 # loaded at run time, which shellcheck cannot see from here.
 # shellcheck disable=SC2154
 # Session providers: the agent CLIs whose sessions can be picked back up.
@@ -18,18 +18,18 @@
 
 providers_load() {
     local f id
-    CW_PROVIDER_IDS=""
-    for f in "$CW_LIB"/providers/*.sh; do
+    PANEFUL_PROVIDER_IDS=""
+    for f in "$PANEFUL_LIB"/providers/*.sh; do
         [ -e "$f" ] || continue
         id=${f##*/}; id=${id%.sh}
-        if [ -n "$CW_PROVIDERS" ]; then
-            case " $CW_PROVIDERS " in *" $id "*) ;; *) continue ;; esac
+        if [ -n "$PANEFUL_PROVIDERS" ]; then
+            case " $PANEFUL_PROVIDERS " in *" $id "*) ;; *) continue ;; esac
         fi
         # shellcheck disable=SC1090
         . "$f"
-        CW_PROVIDER_IDS="$CW_PROVIDER_IDS $id"
+        PANEFUL_PROVIDER_IDS="$PANEFUL_PROVIDER_IDS $id"
     done
-    CW_PROVIDER_IDS=${CW_PROVIDER_IDS# }
+    PANEFUL_PROVIDER_IDS=${PANEFUL_PROVIDER_IDS# }
 }
 
 provider_call() { local id=$1 fn=$2; shift 2; "provider_${id}_${fn}" "$@"; }
@@ -64,8 +64,8 @@ provider_is_uuid() {
 # TSV: provider  tty  sessionId  cwd  name  pid
 providers_sessions() {
     local id
-    [ -n "${CW_PROVIDER_IDS:-}" ] || providers_load
-    for id in $CW_PROVIDER_IDS; do
+    [ -n "${PANEFUL_PROVIDER_IDS:-}" ] || providers_load
+    for id in $PANEFUL_PROVIDER_IDS; do
         provider_call "$id" available 2>/dev/null || continue
         provider_call "$id" live 2>/dev/null || continue
         provider_call "$id" list 2>/dev/null | awk -v p="$id" -F'\t' 'NF >= 2 { print p "\t" $0 }'
@@ -87,7 +87,7 @@ provider_resume_command() {   # $1 provider, $2 sessionId, $3 cwd
 cmd_providers() {
     local id inst live
     providers_load
-    for id in $CW_PROVIDER_IDS; do
+    for id in $PANEFUL_PROVIDER_IDS; do
         inst=no; live=no
         provider_call "$id" available 2>/dev/null && inst=yes
         provider_call "$id" live 2>/dev/null && live=yes
@@ -96,5 +96,5 @@ cmd_providers() {
             "$(provider_call "$id" resume '<id>' "$HOME" 2>/dev/null || echo '-')"
     done
     printf '\nA pane running something this list does not cover is still restored:\n'
-    printf 'the command it was running is recorded and replayed (see CW_REPLAY_POLICY).\n'
+    printf 'the command it was running is recorded and replayed (see PANEFUL_REPLAY_POLICY).\n'
 }

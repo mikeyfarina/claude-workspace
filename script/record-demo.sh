@@ -14,13 +14,13 @@ out=${1:-docs/demo}
 mkdir -p "$(dirname "$out")"
 
 if command -v asciinema >/dev/null 2>&1; then
-    printf 'Recording `claude-workspace simulate` to %s.cast\n' "$out"
-    asciinema rec "$out.cast" --overwrite --title "claude-workspace" \
-        --command "./bin/claude-workspace status; echo; ./bin/claude-workspace simulate"
+    printf 'Recording `paneful simulate` to %s.cast\n' "$out"
+    asciinema rec "$out.cast" --overwrite --title "paneful" \
+        --command "./bin/paneful status; echo; ./bin/paneful simulate"
     printf '\nUpload with: asciinema upload %s.cast\n' "$out.cast"
 else
     printf 'asciinema is not installed (brew install asciinema); capturing plain text instead.\n'
-    { ./bin/claude-workspace status; echo; ./bin/claude-workspace simulate; } > "$out.txt" 2>&1
+    { ./bin/paneful status; echo; ./bin/paneful simulate; } > "$out.txt" 2>&1
     printf 'Wrote %s.txt\n' "$out.txt"
 fi
 
@@ -29,9 +29,9 @@ cat <<'EOF'
 To record the real thing:
 
   1. asciinema rec docs/relaunch.cast
-  2. In that recording, run: claude-workspace status
+  2. In that recording, run: paneful status
   3. Quit your terminal entirely (Cmd+Q) and open it again.
-  4. In any pane once it is back: claude-workspace log
+  4. In any pane once it is back: paneful log
      That shows, per pane, which session it resumed and why.
 
 Step 3 cannot happen inside the recording, so the honest version is two clips:

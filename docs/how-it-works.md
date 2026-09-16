@@ -1,4 +1,4 @@
-# How claude-workspace works
+# How paneful works
 
 The problem is narrower than "restore my terminal", and the narrow part is the
 whole difficulty.
@@ -37,7 +37,7 @@ tell who wrote it. It just believes the pane that the bytes arrived on.
 
 That is the lever. To find out which pane a shell is sitting in:
 
-1. Create a unique empty directory, `~/.local/state/claude-workspace/nonce/<uuid>`.
+1. Create a unique empty directory, `~/.local/state/paneful/nonce/<uuid>`.
 2. Write one OSC 7 sequence naming it straight to `/dev/ttysNNN`.
 3. Ask the terminal which pane now reports that directory.
 4. Write the real directory back.
@@ -74,7 +74,7 @@ new pane is created with its command in its environment, and the shell hook
 runs it at the first prompt.
 
 Both paths run off the same evaluation, so the preview and the real thing can
-never disagree. `claude-workspace simulate` runs that evaluation against the
+never disagree. `paneful simulate` runs that evaluation against the
 live terminal with "pretend it just restarted" set, and prints what each pane
 would do without doing any of it.
 
@@ -152,7 +152,7 @@ command line as if it had been typed.
 
 Ghostty and tmux are exercised directly. The kitty, WezTerm and iTerm2 adapters
 are written from each project's own documentation and have not been run against
-the real thing; `claude-workspace terminals` labels them honestly, and fixing
+the real thing; `paneful terminals` labels them honestly, and fixing
 that is the most useful thing a contributor could do.
 
 Claude Code's pairing is exact. Codex CLI's is usually exact, recovered by

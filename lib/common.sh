@@ -1,70 +1,70 @@
 # shellcheck shell=bash
 # Shared state, configuration, logging and small helpers.
 #
-# Everything here is sourced by bin/claude-workspace and read by the other
+# Everything here is sourced by bin/paneful and read by the other
 # lib files, so shellcheck cannot see the uses from this file alone.
 # shellcheck disable=SC2034
 
-CW_VERSION=0.2.0
+PANEFUL_VERSION=0.2.0
 
-CW_STATE_DIR=${CW_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/claude-workspace}
-CW_CONFIG_DIR=${CW_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/claude-workspace}
-CW_CONFIG_FILE=$CW_CONFIG_DIR/config
-CW_SNAP_DIR=$CW_STATE_DIR/snapshots
-CW_HISTORY_DIR=$CW_STATE_DIR/history
-CW_TTY_DIR=$CW_STATE_DIR/tty
-CW_NONCE_DIR=$CW_STATE_DIR/nonce
-CW_LOG_FILE=$CW_STATE_DIR/activity.log
-CW_LOCK_DIR=$CW_STATE_DIR/save.lock
-CW_LATEST=$CW_SNAP_DIR/latest.json
+PANEFUL_STATE_DIR=${PANEFUL_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/paneful}
+PANEFUL_CONFIG_DIR=${PANEFUL_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/paneful}
+PANEFUL_CONFIG_FILE=$PANEFUL_CONFIG_DIR/config
+PANEFUL_SNAP_DIR=$PANEFUL_STATE_DIR/snapshots
+PANEFUL_HISTORY_DIR=$PANEFUL_STATE_DIR/history
+PANEFUL_TTY_DIR=$PANEFUL_STATE_DIR/tty
+PANEFUL_NONCE_DIR=$PANEFUL_STATE_DIR/nonce
+PANEFUL_LOG_FILE=$PANEFUL_STATE_DIR/activity.log
+PANEFUL_LOCK_DIR=$PANEFUL_STATE_DIR/save.lock
+PANEFUL_LATEST=$PANEFUL_SNAP_DIR/latest.json
 
-# --- defaults, overridable in $CW_CONFIG_FILE ------------------------------
+# --- defaults, overridable in $PANEFUL_CONFIG_FILE ------------------------------
 # How many history snapshots to keep.
-CW_HISTORY_KEEP=${CW_HISTORY_KEEP:-40}
+PANEFUL_HISTORY_KEEP=${PANEFUL_HISTORY_KEEP:-40}
 # What to do with a pane that was running an ordinary command (not an agent):
 #   off    ignore it            prompt  type it, do not press Enter
-#   auto   run it if it matches CW_REPLAY_ALLOW, otherwise prompt
+#   auto   run it if it matches PANEFUL_REPLAY_ALLOW, otherwise prompt
 #   all    run whatever it was
-CW_REPLAY_POLICY=${CW_REPLAY_POLICY:-prompt}
+PANEFUL_REPLAY_POLICY=${PANEFUL_REPLAY_POLICY:-prompt}
 # Commands considered safe to re-run unattended under the "auto" policy.
-CW_REPLAY_ALLOW=${CW_REPLAY_ALLOW:-'^(npm|pnpm|yarn|bun|deno|node|next|vite|nx|turbo|rails|bundle|mix|cargo|go|air|uvicorn|gunicorn|flask|django-admin|python[0-9.]* -m (http\.server|uvicorn|flask)|docker(-| )compose|make|just|task|watch|tail|less|htop|btop|k9s|lazygit|tmux|ssh|serve|jest|vitest|pytest|storybook)\b'}
+PANEFUL_REPLAY_ALLOW=${PANEFUL_REPLAY_ALLOW:-'^(npm|pnpm|yarn|bun|deno|node|next|vite|nx|turbo|rails|bundle|mix|cargo|go|air|uvicorn|gunicorn|flask|django-admin|python[0-9.]* -m (http\.server|uvicorn|flask)|docker(-| )compose|make|just|task|watch|tail|less|htop|btop|k9s|lazygit|tmux|ssh|serve|jest|vitest|pytest|storybook)\b'}
 # Restore window position and size (macOS, needs Accessibility permission).
-CW_RESTORE_BOUNDS=${CW_RESTORE_BOUNDS:-1}
+PANEFUL_RESTORE_BOUNDS=${PANEFUL_RESTORE_BOUNDS:-1}
 # Force a terminal adapter instead of detecting one.
-CW_TERMINAL=${CW_TERMINAL:-}
+PANEFUL_TERMINAL=${PANEFUL_TERMINAL:-}
 # Seconds to wait for a freshly created pane to reach its first prompt.
-CW_READY_TIMEOUT=${CW_READY_TIMEOUT:-45}
+PANEFUL_READY_TIMEOUT=${PANEFUL_READY_TIMEOUT:-45}
 # Providers to consider, in order. Empty means every provider that is installed.
-CW_PROVIDERS=${CW_PROVIDERS:-}
+PANEFUL_PROVIDERS=${PANEFUL_PROVIDERS:-}
 
 # Environment variables the shell hook acts on in a freshly created pane.
-CW_ENV_RUN=CLAUDE_WORKSPACE_RUN
-CW_ENV_PREFILL=CLAUDE_WORKSPACE_PREFILL
+PANEFUL_ENV_RUN=PANEFUL_RUN
+PANEFUL_ENV_PREFILL=PANEFUL_PREFILL
 
-if [ -f "$CW_CONFIG_FILE" ]; then
+if [ -f "$PANEFUL_CONFIG_FILE" ]; then
     # shellcheck disable=SC1090
-    . "$CW_CONFIG_FILE"
+    . "$PANEFUL_CONFIG_FILE"
 fi
 
-mkdir -p "$CW_STATE_DIR" "$CW_SNAP_DIR" "$CW_HISTORY_DIR" "$CW_TTY_DIR" "$CW_NONCE_DIR"
+mkdir -p "$PANEFUL_STATE_DIR" "$PANEFUL_SNAP_DIR" "$PANEFUL_HISTORY_DIR" "$PANEFUL_TTY_DIR" "$PANEFUL_NONCE_DIR"
 
 # --- output ----------------------------------------------------------------
-log() { printf 'claude-workspace: %s\n' "$*" >&2; }
+log() { printf 'paneful: %s\n' "$*" >&2; }
 die() { log "$@"; exit 1; }
 
 logfile() {
     # Keep the activity log bounded without a logrotate dependency.
-    if [ -f "$CW_LOG_FILE" ] && [ "$(wc -c < "$CW_LOG_FILE" | tr -d ' ')" -gt 500000 ]; then
-        tail -n 500 "$CW_LOG_FILE" > "$CW_LOG_FILE.tmp" && mv "$CW_LOG_FILE.tmp" "$CW_LOG_FILE"
+    if [ -f "$PANEFUL_LOG_FILE" ] && [ "$(wc -c < "$PANEFUL_LOG_FILE" | tr -d ' ')" -gt 500000 ]; then
+        tail -n 500 "$PANEFUL_LOG_FILE" > "$PANEFUL_LOG_FILE.tmp" && mv "$PANEFUL_LOG_FILE.tmp" "$PANEFUL_LOG_FILE"
     fi
-    printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$CW_LOG_FILE"
+    printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$PANEFUL_LOG_FILE"
 }
 
 # Say it to the user and record it, so a restore can be audited afterwards.
 say() { log "$*"; logfile "$*"; }
 
 # Print a block to both the terminal and the log.
-tee_log() { tee -a "$CW_LOG_FILE" >&2; }
+tee_log() { tee -a "$PANEFUL_LOG_FILE" >&2; }
 
 short() { printf '%s' "${1/#$HOME/\~}"; }
 
@@ -72,7 +72,7 @@ short() { printf '%s' "${1/#$HOME/\~}"; }
 # never a tab: IFS treats tab as whitespace, so `IFS=$'\t' read` silently
 # collapses runs of tabs and every field after an empty one shifts left.
 # Tabs are still fine for records only awk and jq parse, which do not collapse.
-CW_US=$'\037'
+PANEFUL_US=$'\037'
 # jq filter that emits an array as one unit-separated record.
 JQ_REC='map(tostring) | join("\u001f")'
 
@@ -82,7 +82,7 @@ load() {
     local m
     for m in "$@"; do
         # shellcheck disable=SC1090
-        . "$CW_LIB/$m.sh"
+        . "$PANEFUL_LIB/$m.sh"
     done
 }
 
@@ -133,23 +133,23 @@ osa() {
 snap_path() {   # $1 name (default: latest)
     local name=${1:-latest}
     case $name in
-        latest|"") printf '%s' "$CW_LATEST" ;;
+        latest|"") printf '%s' "$PANEFUL_LATEST" ;;
         /*) printf '%s' "$name" ;;
-        *) printf '%s/%s.json' "$CW_SNAP_DIR" "$name" ;;
+        *) printf '%s/%s.json' "$PANEFUL_SNAP_DIR" "$name" ;;
     esac
 }
 
 cmd_log() {
     local n=${1:-40}
-    [ -f "$CW_LOG_FILE" ] || { log "no activity recorded yet"; return 0; }
-    tail -n "$n" "$CW_LOG_FILE"
+    [ -f "$PANEFUL_LOG_FILE" ] || { log "no activity recorded yet"; return 0; }
+    tail -n "$n" "$PANEFUL_LOG_FILE"
 }
 
 cmd_help() {
     cat <<'EOF'
-claude-workspace — put your terminal back exactly as you left it, agents and all.
+paneful — put your terminal back exactly as you left it, agents and all.
 
-Everyday use (all of it automatic once `claude-workspace install` has run):
+Everyday use (all of it automatic once `paneful install` has run):
 
   install [--dry-run]     wire up the shell hook and the Claude Code hooks
   doctor                  check every moving part and say how to fix what is broken
@@ -179,6 +179,6 @@ Options for restore:
   --replay off|prompt|auto|all
                           what to do with panes that ran an ordinary command
 
-Configuration: ~/.config/claude-workspace/config   State: ~/.local/state/claude-workspace
+Configuration: ~/.config/paneful/config   State: ~/.local/state/paneful
 EOF
 }

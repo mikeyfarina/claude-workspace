@@ -1,34 +1,34 @@
 # shellcheck shell=bash
-# cwterm_* and provider_* come from the adapter and provider files loaded at
+# term_* and provider_* come from the adapter and provider files loaded at
 # run time; the jq programs are single-quoted on purpose.
 # shellcheck disable=SC2154,SC2016
 # Taking, reading and describing snapshots.
 
 # Claude Code and friends put a spinner glyph in front of the pane title while
 # they work. Used only as a fallback when a session's tty is not mapped yet.
-CW_AGENT_TITLE_RE=${CW_AGENT_TITLE_RE:-'^(✳|✻|◐|◓|◑|◒|✶|✽|·)'}
+PANEFUL_AGENT_TITLE_RE=${PANEFUL_AGENT_TITLE_RE:-'^(✳|✻|◐|◓|◑|◒|✶|✽|·)'}
 
 terminal_start_epoch() {
-    declare -f cwterm_start_epoch >/dev/null 2>&1 || { printf '0'; return 0; }
-    cwterm_start_epoch 2>/dev/null || printf '0'
+    declare -f term_start_epoch >/dev/null 2>&1 || { printf '0'; return 0; }
+    term_start_epoch 2>/dev/null || printf '0'
 }
 
 # --- restore markers -------------------------------------------------------
 # All keyed by the terminal's start time, so they expire when it restarts.
-claimed_dir() { printf '%s/claimed-%s' "$CW_STATE_DIR" "$1"; }
+claimed_dir() { printf '%s/claimed-%s' "$PANEFUL_STATE_DIR" "$1"; }
 
 restore_pending() {
-    [ -f "$CW_LATEST" ] || return 1
+    [ -f "$PANEFUL_LATEST" ] || return 1
     local start
     start=$(terminal_start_epoch)
     [ "$start" != 0 ] || return 1
-    [ ! -e "$CW_STATE_DIR/dismissed-$start" ] &&
-        [ "$(jq -r '.terminal.start // .ghosttyStart // 0' "$CW_LATEST")" != "$start" ]
+    [ ! -e "$PANEFUL_STATE_DIR/dismissed-$start" ] &&
+        [ "$(jq -r '.terminal.start // .ghosttyStart // 0' "$PANEFUL_LATEST")" != "$start" ]
 }
 
 prune_markers() {   # $1 current start epoch
     local f
-    for f in "$CW_STATE_DIR"/dismissed-* "$CW_STATE_DIR"/rebuild-* "$CW_STATE_DIR"/claimed-*; do
+    for f in "$PANEFUL_STATE_DIR"/dismissed-* "$PANEFUL_STATE_DIR"/rebuild-* "$PANEFUL_STATE_DIR"/claimed-*; do
         [ -e "$f" ] || continue
         case $f in *-"$1") ;; *) rm -r -- "$f" ;; esac
     done
@@ -138,7 +138,7 @@ def tsv: split("\n") | map(select(length > 0) | split("\t"));
 
 snapshot_capture() {   # $1 name
     local layout sessions commands bounds tty
-    layout=$(cwterm_dump) || die "could not read the $cwterm_label layout"
+    layout=$(term_dump) || die "could not read the $term_label layout"
     prune_tty_map
     sessions=$(providers_sessions)
     commands=""
@@ -148,18 +148,18 @@ snapshot_capture() {   # $1 name
         [ -n "$cmd" ] && commands+="$tty"$'\t'"$cmd"$'\n'
     done
     bounds=""
-    if [ "$CW_RESTORE_BOUNDS" = 1 ] && terminal_has bounds; then
-        bounds=$(cwterm_bounds 2>/dev/null | sed -n 's/^WB\t//p')
+    if [ "$PANEFUL_RESTORE_BOUNDS" = 1 ] && terminal_has bounds; then
+        bounds=$(term_bounds 2>/dev/null | sed -n 's/^WB\t//p')
     fi
     jq -Rn \
         --arg sessions "$sessions" --arg map "$(tty_map)" --arg commands "$commands" \
-        --arg bounds "$bounds" --arg agentTitle "$CW_AGENT_TITLE_RE" \
+        --arg bounds "$bounds" --arg agentTitle "$PANEFUL_AGENT_TITLE_RE" \
         --arg name "${1:-latest}" \
         --arg savedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --arg savedAtLocal "$(date '+%Y-%m-%d %H:%M')" \
         --argjson savedAtEpoch "$(date +%s)" \
-        --arg termId "$CW_TERM" --arg termLabel "$cwterm_label" \
-        --arg termVersion "$(cwterm_version 2>/dev/null || true)" \
+        --arg termId "$PANEFUL_TERM" --arg termLabel "$term_label" \
+        --arg termVersion "$(term_version 2>/dev/null || true)" \
         --argjson termStart "$(terminal_start_epoch)" \
         --arg host "$(hostname)" --arg screens "$(screen_frames)" \
         "$JQ_BUILD" <<<"$layout"
@@ -168,7 +168,7 @@ snapshot_capture() {   # $1 name
 # Newest first. `ls -t` cannot be used safely, and a glob cannot sort by time.
 history_by_age() {
     local f
-    for f in "$CW_HISTORY_DIR"/*.json; do
+    for f in "$PANEFUL_HISTORY_DIR"/*.json; do
         [ -e "$f" ] || continue
         printf '%s\t%s\n' "$(stat -f %m "$f")" "$f"
     done | sort -rn | cut -f2-
@@ -179,7 +179,7 @@ prune_history() {
     while IFS= read -r f; do
         [ -n "$f" ] || continue
         n=$((n + 1))
-        [ "$n" -gt "$CW_HISTORY_KEEP" ] && rm -- "$f"
+        [ "$n" -gt "$PANEFUL_HISTORY_KEEP" ] && rm -- "$f"
     done < <(history_by_age)
     return 0
 }
@@ -198,7 +198,7 @@ cmd_save() {
     [ "$delay" -gt 0 ] && sleep "$delay"
 
     terminal_load
-    cwterm_present || { log "$cwterm_label is not running; nothing saved"; return 0; }
+    term_present || { log "$term_label is not running; nothing saved"; return 0; }
 
     local target
     target=$(snap_path "$name")
@@ -207,22 +207,22 @@ cmd_save() {
     fi
 
     # One save at a time. A lock older than 60s belongs to a save that died.
-    if ! mkdir "$CW_LOCK_DIR" 2>/dev/null; then
-        if [ $(( $(date +%s) - $(stat -f %m "$CW_LOCK_DIR") )) -gt 60 ]; then
-            rmdir "$CW_LOCK_DIR"; mkdir "$CW_LOCK_DIR" 2>/dev/null || return 0
+    if ! mkdir "$PANEFUL_LOCK_DIR" 2>/dev/null; then
+        if [ $(( $(date +%s) - $(stat -f %m "$PANEFUL_LOCK_DIR") )) -gt 60 ]; then
+            rmdir "$PANEFUL_LOCK_DIR"; mkdir "$PANEFUL_LOCK_DIR" 2>/dev/null || return 0
         else
             return 0
         fi
     fi
     # shellcheck disable=SC2064
-    trap "rmdir '$CW_LOCK_DIR' 2>/dev/null" EXIT
+    trap "rmdir '$PANEFUL_LOCK_DIR' 2>/dev/null" EXIT
 
     local start snap
     start=$(terminal_start_epoch)
     snap=$(snapshot_capture "$name")
     # Never let a half-built snapshot replace a good one.
     if [ -z "$snap" ] || ! jq -e '.counts.terminals' <<<"$snap" >/dev/null 2>&1; then
-        log "could not build a snapshot from $cwterm_label; kept the previous one"
+        log "could not build a snapshot from $term_label; kept the previous one"
         return 1
     fi
 
@@ -232,18 +232,18 @@ cmd_save() {
         return 0
     fi
 
-    printf '%s\n' "$snap" > "$CW_HISTORY_DIR/$(date +%Y%m%d-%H%M%S).json"
+    printf '%s\n' "$snap" > "$PANEFUL_HISTORY_DIR/$(date +%Y%m%d-%H%M%S).json"
     prune_history
 
-    if [ "$force" -eq 0 ] && [ -f "$CW_LATEST" ]; then
+    if [ "$force" -eq 0 ] && [ -f "$PANEFUL_LATEST" ]; then
         local old_sessions old_start new_sessions
-        old_sessions=$(jq '.counts.sessions' "$CW_LATEST")
-        old_start=$(jq -r '.terminal.start // .ghosttyStart // 0' "$CW_LATEST")
+        old_sessions=$(jq '.counts.sessions' "$PANEFUL_LATEST")
+        old_start=$(jq -r '.terminal.start // .ghosttyStart // 0' "$PANEFUL_LATEST")
         new_sessions=$(jq '.counts.sessions' <<<"$snap")
         # The terminal restarted since this snapshot: it is the one a restore
         # needs, so keep it until the restore finishes or is dismissed.
-        if [ "$old_start" != "$start" ] && [ ! -e "$CW_STATE_DIR/dismissed-$start" ]; then
-            logfile "a restore is pending (snapshot from $(jq -r .savedAtLocal "$CW_LATEST")); wrote history only"
+        if [ "$old_start" != "$start" ] && [ ! -e "$PANEFUL_STATE_DIR/dismissed-$start" ]; then
+            logfile "a restore is pending (snapshot from $(jq -r .savedAtLocal "$PANEFUL_LATEST")); wrote history only"
             return 0
         fi
         if [ "$new_sessions" -eq 0 ] && [ "$old_sessions" -gt 0 ]; then
@@ -253,9 +253,9 @@ cmd_save() {
     fi
 
     local tmp
-    tmp=$(mktemp "$CW_SNAP_DIR/.latest.XXXXXX")
+    tmp=$(mktemp "$PANEFUL_SNAP_DIR/.latest.XXXXXX")
     printf '%s\n' "$snap" > "$tmp"
-    mv "$tmp" "$CW_LATEST"
+    mv "$tmp" "$PANEFUL_LATEST"
     prune_markers "$start"
     jq -r '"saved \(.counts.tabs) tabs, \(.counts.terminals) panes, \(.counts.sessions) sessions (\(.counts.placed) placed)"' <<<"$snap" >&2
 }
@@ -277,31 +277,31 @@ print_plan() {   # $1 snapshot json
 
 cmd_status() {
     local snap
-    snap=$(snapshot_read "${1:-latest}") || die "no snapshot yet (run: claude-workspace save)"
+    snap=$(snapshot_read "${1:-latest}") || die "no snapshot yet (run: paneful save)"
     terminal_load
     print_plan "$snap"
     if restore_pending; then
-        log "restore pending: yes ($cwterm_label restarted since this snapshot)"
+        log "restore pending: yes ($term_label restarted since this snapshot)"
     else
         log "restore pending: no"
     fi
     log "panes with a known tty: $(tty_map | wc -l | tr -d ' ')   history: $(history_by_age | wc -l | tr -d ' ') snapshots"
-    if [ -f "$CW_LOG_FILE" ]; then
+    if [ -f "$PANEFUL_LOG_FILE" ]; then
         log "last activity:"
-        tail -n 5 "$CW_LOG_FILE" | sed 's/^/  /' >&2
+        tail -n 5 "$PANEFUL_LOG_FILE" | sed 's/^/  /' >&2
     fi
 }
 
 cmd_list() {
     local f name
     printf 'named snapshots:\n'
-    for f in "$CW_SNAP_DIR"/*.json; do
+    for f in "$PANEFUL_SNAP_DIR"/*.json; do
         [ -e "$f" ] || continue
         name=${f##*/}; name=${name%.json}
         jq -r --arg n "$name" '"  \($n)\t\(.savedAtLocal)\t\(.counts.tabs) tabs, \(.counts.terminals) panes, \(.counts.sessions) sessions"' "$f"
     done
-    printf '\nsave a named one with: claude-workspace save --name <name>\n'
-    printf 'restore it with:        claude-workspace restore <name>\n'
+    printf '\nsave a named one with: paneful save --name <name>\n'
+    printf 'restore it with:        paneful restore <name>\n'
 }
 
 cmd_history() {
@@ -316,8 +316,8 @@ cmd_dismiss() {
     terminal_load
     local start
     start=$(terminal_start_epoch)
-    [ "$start" != 0 ] || die "$cwterm_label is not running"
-    touch "$CW_STATE_DIR/dismissed-$start"
+    [ "$start" != 0 ] || die "$term_label is not running"
+    touch "$PANEFUL_STATE_DIR/dismissed-$start"
     say "dismissed; the next save replaces the pending snapshot"
 }
 
@@ -333,6 +333,6 @@ cmd_hook() {
         *) exit 0 ;;
     esac
     # shellcheck disable=SC2086
-    nohup "$CW_BIN_DIR/claude-workspace" save $args >/dev/null 2>&1 </dev/null &
+    nohup "$PANEFUL_BIN_DIR/paneful" save $args >/dev/null 2>&1 </dev/null &
     exit 0
 }
